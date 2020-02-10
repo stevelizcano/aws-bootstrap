@@ -1,0 +1,22 @@
+version: 0.2
+# Tells CodeBuild what to do
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 12
+  pre_build:
+    commands:
+      # run 'npm install using version in pack-lock json'
+      - npm ci
+  build:
+    commands:
+      - npm run build
+artifacts:
+  files:
+    - start-service.sh
+    - stop-service.sh
+    - server.js
+    - package.json
+    - appspec.yml
+    - 'node_modules/**/*'
