@@ -1,3 +1,25 @@
 version: 0.0
 # Tells CodeDeploy what to do with the build artifacts from CodeBuild
 
+os: linux
+files:
+  # unzips the build artifact in ~/app
+  - source: /
+    destination: /home/ec2-user/app/release
+permissions:
+  # change permissions from root to ec2-user
+  - object: /home/ec2-user/app/release
+  pattern: "**"
+  owner: ec2-user
+  group: ec2-user
+hooks:
+  ApplicationStart:
+  # start the app
+    - location: start-service.sh
+    timeout: 300
+    runas: ec2-user
+  ApplicationStop:
+    #stops the app
+    - location: stop-service.sh
+    timeout: 300
+    runas: ec2-user

@@ -8,6 +8,15 @@ AWS_ACCOUNT_ID=`aws sts get-caller-identity --profile awsbootstrap \
 EC2_INSTANCE_TYPE=t2.micro
 CODEPIPELINE_BUCKET="$STACK_NAME-$REGION-codepipeline-$AWS_ACCOUNT_ID"
 
+# Generate a personal access token with repo and admin:repo_hook
+# permissions form github tokens
+
+GH_ACCESS_TOKEN=$(cat ~/.githib/aws-bootstrap-access-token)
+GH_OWNER=$(cat ~/.github/aws-bootstrap-owner)
+GH_REPO=$(cat ~/.github/aws-bootstrap-repo)
+GH_BRANCH=master
+
+
 # Deploy static resources
 echo -e "\n\n==Deploying setup.yml =="
 aws cloudformation deploy \
@@ -18,7 +27,9 @@ aws cloudformation deploy \
   --no-fail-on-empty-changeset \
   --capabilties CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    CodePipelineBucket=$CODEPIPELINE_BUCKET
+    CodePipelineBucket=$CODEPIPELINE_BUCKET \
+    GitHubOwner=$GH_OWNER \
+    GitHubRepo=$GH_REPO \ GitHubBranch=$GH_BRANCH \ GitHubPersonalAccessToken=$GH_ACCESS_TOKEN \ CodePipelineBucket=$CODEPIPELINE_BUCKET
 
 # Deploy the CloudFormation template
 echo -e "\n\n=========== Deploying main.yml ==========="
