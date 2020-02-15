@@ -4,42 +4,44 @@ Parameters:
   EC2InstanceType:
     Type: String
   EC2AMI:
-    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
   CodePipelineBucket:
     Type: String
-    Description: 'S3 bucket for pipeline artifacts'
+    Description: "The S3 bucket for CodePipeline artifacts."
   GitHubOwner:
     Type: String
-    Description: 'The username of the source GitHub repo'
-  GitHubBranch:
-    Type: String
-    Description: 'the source github branch'
+    Description: "The username of the source GitHub repo."
   GitHubRepo:
     Type: String
-    Description: 'the source github repo name without username'
+    Description: "The source GitHub repo name (without the username)."
+  GitHubBranch:
+    Type: String
+    Default: master
+    Description: "The source GitHub branch."
   GitHubPersonalAccessToken:
     Type: String
-    Description: 'github token with repo and admin:repo_hook priveleges'
+    NoEcho: true
+    Description: 'A GitHub personal access token with "repo" and "admin:repo_hook" permissions.'
 
 Resources:
-  
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub 'Internal Security group for ${AWS::StackName}'
+      GroupDescription: !Sub "Security group for ${AWS::StackName}"
       SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: 8080
-        ToPort: 8080
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
           Value: !Ref AWS::StackName
+
   InstanceRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -57,8 +59,9 @@ Resources:
       Tags:
         - Key: Name
           Value: !Ref AWS::StackName
+
   InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
+    Type: "AWS::IAM::InstanceProfile"
     Properties:
       Roles:
         - Ref: InstanceRole
@@ -67,23 +70,20 @@ Resources:
     Type: AWS::EC2::Instance
     CreationPolicy:
       ResourceSignal:
-        Timeout: PT15M
+        Timeout: PT5M
         Count: 1
     Metadata:
       AWS::CloudFormation::Init:
         config:
           packages:
             yum:
-              ruby: [] # Codedeploy requires ruby
-              wget: []
-              unzip: []
+              ruby: []
           files:
             /home/ec2-user/install:
-              #Downloads CodeDeploy agent
-              source: !Sub "https://aws-codedeploy- ${AWS::Region}.s3.amazonaws.com/latest/install"
-              mode: "000755" #makes it executable
+              source: !Sub "https://aws-codedeploy-${AWS::Region}.s3.amazonaws.com/latest/install"
+              mode: "000755" # executable
           commands:
-            00--install-cd-agent:
+            00-install-cd-agent:
               command: "./install auto"
               cwd: "/home/ec2-user/"
     Properties:
@@ -93,7 +93,7 @@ Resources:
       Monitoring: true
       SecurityGroupIds:
         - !GetAtt SecurityGroup.GroupId
-      UserData: 
+      UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
 
@@ -131,16 +131,14 @@ Resources:
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --region ${AWS::Region} --resource Instance
           # Signal to CloudFormation that the instance is ready
           /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource Instance
-
       Tags:
         - Key: Name
           Value: !Ref AWS::StackName
 
-
   DeploymentRole:
     Type: AWS::IAM::Role
     Properties:
-      AssumeRolePolicyDocument: 
+      AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           Effect: Allow
@@ -166,12 +164,13 @@ Resources:
         Image: aws/codebuild/standard:2.0
       Source:
         Type: CODEPIPELINE
+
   DeploymentApplication:
     Type: AWS::CodeDeploy::Application
     Properties:
       ApplicationName: !Ref AWS::StackName
-      ComputePlatform: Server 
-      # Server means EC2
+      ComputePlatform: Server
+
   StagingDeploymentGroup:
     Type: AWS::CodeDeploy::DeploymentGroup
     DependsOn: Instance
@@ -180,10 +179,11 @@ Resources:
       ApplicationName: !Ref DeploymentApplication
       DeploymentConfigName: CodeDeployDefault.AllAtOnce
       ServiceRoleArn: !GetAtt DeploymentRole.Arn
-      Ec2TagFilters: # Defines howCodeDeploy finds the EC2 instances
+      Ec2TagFilters:
         - Key: aws:cloudformation:stack-name
           Type: KEY_AND_VALUE
           Value: !Ref AWS::StackName
+
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -195,21 +195,21 @@ Resources:
       Stages:
         - Name: Source
           Actions:
-              - Name: Source
-                ActionTypeId:
-                  Category: Source
-                  Owner: ThirdParty
-                  Version: 1
-                  Provider: GitHub
-                OutputArtifacts:
-                  - Name: Source
-                Configuration:
-                  Owner: !Ref GitHubOwner
-                  Repo: !Ref GitHubRepo
-                  Branch: !Ref GitHubBranch
-                  OAuthToken: !Ref GitHubPersonalAccessToken
-                  PollForSourceChanges: false
-                RunOrder: 1
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: Source
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubPersonalAccessToken
+                PollForSourceChanges: false
+              RunOrder: 1
         - Name: Build
           Actions:
             - Name: Build
@@ -239,18 +239,19 @@ Resources:
                 ApplicationName: !Ref DeploymentApplication
                 DeploymentGroupName: !Ref StagingDeploymentGroup
               RunOrder: 1
-  PipelineWebHook:
+
+  PipelineWebhook:
     Type: AWS::CodePipeline::Webhook
     Properties:
-      Filters:
-        - JsonPath: $.ref
-          MatchEquals: 'refs/heads/{Branch}'
       Authentication: GITHUB_HMAC
       AuthenticationConfiguration:
         SecretToken: !Ref GitHubPersonalAccessToken
+      Filters:
+        - JsonPath: $.ref
+          MatchEquals: "refs/heads/{Branch}"
       TargetPipeline: !Ref Pipeline
       TargetAction: Source
-      Name: !Sub 'webhook-${AWS::StackName}'
+      Name: !Sub "webhook-${AWS::StackName}"
       TargetPipelineVersion: !GetAtt Pipeline.Version
       RegisterWithThirdParty: true
 
@@ -260,4 +261,3 @@ Outputs:
     Value: !Sub "http://${Instance.PublicDnsName}:8080"
     Export:
       Name: InstanceEndpoint
-
